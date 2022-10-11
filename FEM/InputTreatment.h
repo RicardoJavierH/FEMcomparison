@@ -7,6 +7,7 @@
 
 #include "DataStructure.h"
 
+void DataInitialization(int argc, char *argv[],PreConfig &pConfig);
 
 void EvaluateEntry(int argc, char *argv[],PreConfig &eData);
 void ReadEntry(ProblemConfig &config, PreConfig &preConfig);

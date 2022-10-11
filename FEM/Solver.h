@@ -8,6 +8,7 @@
 #include <TPZMultiphysicsCompMesh.h>
 #include "TPZLinearAnalysis.h"
 #include "DataStructure.h"
+
 void calcstiffTestTBB(TPZCompMesh *cmesh, int nthreads);
 void calcstiffTestOMP(TPZCompMesh *cmesh, int nthreads);
 
@@ -34,6 +35,8 @@ void StockErrorsH1(TPZAnalysis &an,TPZCompMesh *cmesh,std::ofstream &Erro, TPZVe
 //// Error Management
 void StockErrors(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh,std::ofstream &Erro, TPZVec<REAL> *Log, PreConfig &eData);
 
+void ComputePragerSynge(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofstream &Erro, TPZVec<REAL> *Log,PreConfig &pConfig);
+
 //// Solve desired problem
 void Solve(ProblemConfig &config, PreConfig &preConfig);
 
@@ -41,5 +44,10 @@ void Solve(ProblemConfig &config, PreConfig &preConfig);
 void DrawMesh(ProblemConfig &config, PreConfig &preConfig, TPZCompMesh *cmesh, TPZMultiphysicsCompMesh *multiCmesh);
 
 void NonConformAssemblage(TPZMultiphysicsCompMesh *multiCmesh,int InterfaceMatId, struct ProblemConfig config,struct PreConfig &pConfig, bool isHybridH1);
+
+void CreateH1MixCompMesh(TPZCompMesh *cmesh, TPZMultiphysicsCompMesh *multiMix, TPZMultiphysicsCompMesh *multH1Mix,PreConfig &h1Config, ProblemConfig &ConfHyb);
+
+
+void VerifyPragerSynge(int argc, char *argv[],PreConfig &pConfigH1, PreConfig &pConfigMix);
 
 #endif //FEMCOMPARISON_ANALYTICS_H

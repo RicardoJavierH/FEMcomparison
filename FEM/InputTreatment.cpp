@@ -20,10 +20,11 @@ void Configure(ProblemConfig &config,int ndiv,PreConfig &pConfig,char *argv[]){
 #endif
     
     bool isOriginCentered = 0; /// Wheater the domain = [0,1]x^n or [-1,1]^n
-    if(pConfig.type == 2) isOriginCentered = 1;
+    if(pConfig.type == 2)
+        isOriginCentered = 1;
 
     TPZGeoMesh *gmesh;
-    TPZManVector<int, 4> bcids(4, -1);
+    TPZManVector<int, 4> bcids(4, -1); //bcids[1] = -1;
     gmesh = CreateGeoMesh(1, bcids, config.dimension,isOriginCentered,pConfig.topologyMode);
 
     UniformRefinement(config.ndivisions, gmesh);
@@ -53,6 +54,11 @@ void Configure(ProblemConfig &config,int ndiv,PreConfig &pConfig,char *argv[]){
     }
 }
 
+void DataInitialization(int argc, char *argv[],PreConfig &pConfig){
+    EvaluateEntry(argc,argv,pConfig);
+    InitializeOutstream(pConfig,argv);
+}
+
 void ReadEntry(ProblemConfig &config, PreConfig &preConfig){
 
 #ifndef OPTMIZE_RUN_TIME
@@ -69,7 +75,7 @@ void ReadEntry(ProblemConfig &config, PreConfig &preConfig){
             preConfig.h*=2;
             break;
         case 3:
-            config.exact.operator*().fExact = TLaplaceExample1::ESteepWave;
+            //config.exact.operator*().fExact = TLaplaceExample1::ESteepWave;
             break;
         default:
             DebugStop();

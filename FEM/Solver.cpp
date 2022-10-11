@@ -22,6 +22,8 @@
 #include <chrono>
 #include "TPZFrontSym.h"
 #include "TPZStructMatrixOMPorTBB.h"
+#include "InputTreatment.h"
+
 #ifdef FEMCOMPARISON_USING_MKL
 #include "mkl.h"
 #endif
@@ -206,7 +208,7 @@ void CreateHybridH1ComputationalMesh(TPZMultiphysicsCompMesh *cmesh_H1Hybrid,int
 void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct PreConfig &pConfig){
 
 #ifndef OPTMIZE_RUN_TIME
-    config.exact.operator*().fSignConvention = -1;
+    config.exact.operator*().fSignConvention = 1;
 #endif
     
     std::cout << "Solving H1 " << std::endl;
@@ -214,20 +216,33 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
     TPZLinearAnalysis an(cmeshH1);
 
 #ifdef FEMCOMPARISON_USING_MKL
-    TPZSSpStructMatrix<> strmat(cmeshH1);
-    strmat.SetNumThreads(0);
+//    TPZSSpStructMatrix<> strmat(cmeshH1);
+//    strmat.SetNumThreads(0);
+    
+    TPZSSpStructMatrix<STATE,TPZStructMatrixOMPorTBB<STATE>> strmat(cmeshH1);
+    strmat.SetNumThreads(pConfig.tData.nThreads);
+    auto *strmatPointer = new TPZSSpStructMatrix(strmat);
+    
+    auto myParInterface = dynamic_cast<TPZStructMatrixOMPorTBB<STATE>*>(strmatPointer);
+    if(myParInterface){
+        myParInterface->SetShouldColor(pConfig.shouldColor);
+        myParInterface->SetTBBorOMP(pConfig.isTBB);
+    }
     //        strmat.SetDecomposeType(ELDLt);
 #else
-    TPZParFrontStructMatrix<TPZFrontSym<STATE> > strmat(cmeshH1);
+    //TPZParFrontStructMatrix<TPZFrontSym<STATE> > strmat(cmeshH1);
+    
+    TPZSSpStructMatrix<> strmat(cmeshH1);
     strmat.SetNumThreads(0);
     //        TPZSkylineStructMatrix strmat3(cmesh_HDiv);
     //        strmat3.SetNumThreads(8);
 #endif
     
     std::set<int> matids;
-    for (auto matid : config.materialids) matids.insert(matid);
+    for (auto matid : config.materialids)
+        matids.insert(matid);
 
-    for(auto mat:config.bcmaterialids){
+    for(auto mat : config.bcmaterialids){
         matids.insert(mat);
     }
 
@@ -239,8 +254,11 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
     an.SetSolver(*direct);
     delete direct;
     direct = 0;
+    
     an.Assemble();
-    an.Solve();//resolve o problema misto ate aqui
+    an.Solve();
+    
+    //cmeshH1->Print(std::cout);
 
     int64_t nelem = cmeshH1->NElements();
     cmeshH1->LoadSolution(cmeshH1->Solution());
@@ -285,7 +303,7 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
 void SolveHybridH1Problem(TPZMultiphysicsCompMesh *cmesh_H1Hybrid,int InterfaceMatId, struct ProblemConfig config,struct PreConfig &pConfig){
 
 #ifndef OPTMIZE_RUN_TIME
-    config.exact.operator*().fSignConvention = 1;
+    config.exact.operator*().fSignConvention = 1; 
 #endif
     NonConformAssemblage(cmesh_H1Hybrid,InterfaceMatId,config,pConfig,1);
 }
@@ -307,20 +325,27 @@ void StockErrorsH1(TPZAnalysis &an,TPZCompMesh *cmesh, std::ofstream &Erro, TPZV
 
     an.PostProcessError(Errors, store_errors, Erro);
 
-    if ((*Log)[0] != -1) {
-        for (int j = 0; j < 3; j++) {
-            (*pConfig.rate)[j] =
-                    (log10(Errors[j]) - log10((*Log)[j])) /
-                    (log10(pConfig.h) - log10(pConfig.hLog));
-            Erro << "rate " << j << ": " << (*pConfig.rate)[j] << std::endl;
-        }
+    std::cout << "Errors =(";
+    for (int i = 0; i < Errors.size(); i++){
+        std::cout << Errors[i];
+        if(i<Errors.size()-1) std::cout << ", ";
     }
-
-    Erro << "h = " << pConfig.h << std::endl;
-    Erro << "DOF = " << cmesh->NEquations() << std::endl;
-    for (int i = 0; i < pConfig.numErrors; i++)
-        (*Log)[i] = Errors[i];
-    Errors.clear();
+    std::cout << ")" << std::endl;
+    
+//    if ((*Log)[0] != -1) {
+//        for (int j = 0; j < 3; j++) {
+//            (*pConfig.rate)[j] =
+//                    (log10(Errors[j]) - log10((*Log)[j])) /
+//                    (log10(pConfig.h) - log10(pConfig.hLog));
+//            Erro << "rate " << j << ": " << (*pConfig.rate)[j] << std::endl;
+//        }
+//    }
+//
+//    Erro << "h = " << pConfig.h << std::endl;
+//    Erro << "DOF = " << cmesh->NEquations() << std::endl;
+//    for (int i = 0; i < pConfig.numErrors; i++)
+//        (*Log)[i] = Errors[i];
+//    Errors.clear();
 }
 
 void StockErrors(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofstream &Erro, TPZVec<REAL> *Log,PreConfig &pConfig){
@@ -337,8 +362,8 @@ void StockErrors(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofstream &
         std::cout << Errors[i];
         if(i<Errors.size()-1) std::cout << ", ";
     }
-    
     std::cout << ")" << std::endl;
+    
     //std::cout<<"nnnnnnnn"<<std::endl;
     //for(int i=0;i<Errors.size();i++)
         //std::cout<<Errors[i]<<std::endl;
@@ -358,10 +383,32 @@ void StockErrors(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofstream &
 //    Errors.clear();
 }
 
+void ComputePragerSynge(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofstream &Erro, TPZVec<REAL> *Log,PreConfig &pConfig){
+
+    TPZManVector<REAL,3> terms;
+    int nTerms = 3;
+    terms.resize(nTerms);
+    bool store_errors = false;
+
+    an.PostProcessError(terms, store_errors, Erro);
+    //an.PostProcessError(Errors, store_errors);
+    
+    std::cout << "Terms =(";
+    for (int i = 0; i < terms.size(); i++){
+        std::cout << terms[i];
+        if(i<nTerms) std::cout << ", ";
+    }
+    std::cout << ")" << std::endl;
+    
+    std::cout << "term0+term1-term2: " << terms[0]+terms[1]-terms[2] << std::endl;
+    
+}
+
+
 void NonConformAssemblage(TPZMultiphysicsCompMesh *multiCmesh,int InterfaceMatId, struct ProblemConfig config,struct PreConfig &pConfig, bool isHybridH1){
 
-    unsigned long int assembleDuration;
-    unsigned long int solveDuration;
+//    unsigned long int assembleDuration;
+//    unsigned long int solveDuration;
     
     std::cout << "Solving " << pConfig.approx << " " << pConfig.topology << " ref " << pConfig.refLevel << " nThreads " << pConfig.tData.nThreads << " isColoring " << pConfig.shouldColor << " isTBB " << pConfig.isTBB << std::endl;
     {
@@ -372,11 +419,11 @@ void NonConformAssemblage(TPZMultiphysicsCompMesh *multiCmesh,int InterfaceMatId
     
     TPZLinearAnalysis an(multiCmesh);
     
-//    {
-//        TPZFMatrix<REAL> mat(50,50);
-//        multiCmesh->ComputeFillIn(50, mat);
-//        VisualMatrix(mat, "arch2.vtk");
-//    }
+    {
+        TPZFMatrix<REAL> mat(50,50);
+        multiCmesh->ComputeFillIn(50, mat);
+        VisualMatrix(mat, "arch2.vtk");
+    }
 #ifdef FEMCOMPARISON_USING_MKL
     TPZSSpStructMatrix<STATE,TPZStructMatrixOMPorTBB<STATE>> strmat(multiCmesh);
     strmat.SetNumThreads(pConfig.tData.nThreads);
@@ -391,13 +438,17 @@ if(myParInterface){
 
 #else
     //TPZSkylineStructMatrix strmat(cmesh_H1Hybrid);
+    
     TPZSSpStructMatrix<> strmat(multiCmesh);
+    
     strmat.SetNumThreads(0);
 #endif
     
     std::set<int> matIds;
-    for (auto matid : config.materialids) matIds.insert(matid);
-    for (auto matidbc : config.bcmaterialids) matIds.insert(matidbc);
+    for (auto matid : config.materialids)
+        matIds.insert(matid);
+    for (auto matidbc : config.bcmaterialids)
+        matIds.insert(matidbc);
 
     if (isHybridH1){
         matIds.insert(InterfaceMatId);
@@ -412,28 +463,38 @@ if(myParInterface){
     delete direct;
     direct = 0;
 #ifdef FEMCOMPARISON_TIMER
-        auto beginAss = std::chrono::high_resolution_clock::now();
+    auto beginAss = std::chrono::high_resolution_clock::now();
 
 #endif
         
-        an.Assemble();
-        
+    an.Assemble();
+    
+    if(0){//MARK: Compute condition number
+        double cond = an.MatrixSolver<STATE>().Matrix()->ConditionNumber(2);
+        TPZFMatrix<STATE> &frhs = an.Rhs();
+        frhs*=-1;
+        std::cout << "CondNumber:\t"<< cond << std::endl;
+    }
+    
 #ifdef FEMCOMPARISON_TIMER
-        
-        auto endAss = std::chrono::high_resolution_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endAss - beginAss);
-        pConfig.tData.assembleTime = static_cast<unsigned long int>(elapsed.count());
+    auto endAss = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(endAss - beginAss);
+    pConfig.tData.assembleTime = static_cast<unsigned long int>(elapsed.count());
 #endif
     
 #ifdef FEMCOMPARISON_TIMER
-            auto begin = std::chrono::high_resolution_clock::now();
+    auto begin = std::chrono::high_resolution_clock::now();
 #endif
-        int effNthreads = pConfig.tData.nThreads;
-        if (effNthreads == 0) effNthreads =1;
+        
+    int effNthreads = pConfig.tData.nThreads;
+    if (effNthreads == 0) effNthreads =1;
+    
 #ifdef FEMCOMPARISON_USING_MKL
     mkl_set_num_threads_local(effNthreads);
 #endif
-        an.Solve();
+        
+    an.Solve();
+    
 #ifdef FEMCOMPARISON_TIMER
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsedSolve = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
@@ -496,8 +557,8 @@ if(myParInterface){
         an.SetExact(config.exact.operator*().ExactSolution());
 #endif
         ////Calculo do erro
-        StockErrors(an,multiCmesh,pConfig.Erro,pConfig.Log,pConfig);
-        std::cout << "DOF = " << multiCmesh->NEquations() << std::endl;
+//        StockErrors(an,multiCmesh,pConfig.Erro,pConfig.Log,pConfig);
+//        std::cout << "DOF = " << multiCmesh->NEquations() << std::endl;
     
         ////PostProcess
         TPZStack<std::string> scalnames, vecnames;
@@ -527,4 +588,98 @@ if(myParInterface){
         an.DefineGraphMesh(dim, scalnames, vecnames, plotname);
         an.PostProcess(resolution, dim);
     }
+}
+
+
+void VerifyPragerSynge(int argc, char *argv[],PreConfig &pConfigH1, PreConfig &pConfigMix){
+
+    //MARK: H1
+    DataInitialization(argc,argv,pConfigH1);
+    if (pConfigH1.mode != 0){
+        DebugStop();
+    }
+    
+    ProblemConfig configH1;
+    Configure(configH1,pConfigH1.refLevel,pConfigH1,argv);
+
+    TPZCompMesh *cmeshH1 = InsertCMeshH1(configH1,pConfigH1);
+    SolveH1Problem(cmeshH1, configH1, pConfigH1);
+
+    if(1){
+        std::ofstream ofs1("CmeshH1.txt");
+        cmeshH1->Print(ofs1);
+        //cmeshH1->Solution().Print("solU_H1");
+        std::string command = "cp Erro.txt FEMH1_Erro.txt";
+        system(command.c_str());
+    }
+    
+    //MARK: Mixed
+    DataInitialization(argc,argv,pConfigMix);
+    if (pConfigMix.mode != 2) DebugStop();
+
+    ProblemConfig configMix;
+    Configure(configMix,pConfigMix.refLevel,pConfigMix,argv);
+    configMix.gmesh->ResetReference();
+    configMix.gmesh = configH1.gmesh;
+    
+    TPZMultiphysicsCompMesh *cmeshMix = new TPZMultiphysicsCompMesh(configMix.gmesh);
+
+    int interfaceMatID = -10;
+    int fluxMatID = -10;
+
+    CreateMixedComputationalMesh(cmeshMix, pConfigMix, configMix);
+    SolveMixedProblem(cmeshMix, configMix, pConfigMix);
+    
+    if(1){
+        std::ofstream ofs2("CmeshMix.txt");
+        cmeshMix->Print(ofs2);
+        //cmeshMix->Solution().Print("solMix");
+    }
+    
+    //MARK: Prager-Synge
+    TPZMultiphysicsCompMesh *cmeshH1Mix = new TPZMultiphysicsCompMesh(configH1.gmesh);
+    CreateH1MixCompMesh(cmeshH1,cmeshMix,cmeshH1Mix,pConfigH1,configMix);
+    TPZLinearAnalysis an(cmeshH1Mix,false);
+    
+    if(1){
+        std::ofstream ofs("CmeshH1Mix.txt");
+        cmeshH1Mix->Print(ofs);
+    }
+    
+    PreConfig pConfigH1Mix;
+    ComputePragerSynge(an,cmeshH1Mix,pConfigH1Mix.Erro,pConfigH1Mix.Log,pConfigH1Mix);
+    //PostProcessH1Mix(cmeshH1Mix,pConfigH1,configMix);
+}
+
+void CreateH1MixCompMesh(TPZCompMesh *cmeshH1, TPZMultiphysicsCompMesh *cmeshMix, TPZMultiphysicsCompMesh *cmeshH1Mix,PreConfig &pConfigH1, ProblemConfig &configMix){
+    // initialize the post processing mesh
+    //fOriginal->CopyMaterials(fPostProcMesh);
+
+    InsertMaterialH1Mix(cmeshH1Mix,pConfigH1,configMix);
+    
+    TPZGeoMesh* gmesh = cmeshH1Mix->Reference();
+    if(cmeshH1->Reference() != gmesh)
+        DebugStop();
+    if(cmeshMix->Reference() != gmesh)
+        DebugStop();
+        
+    TPZManVector<TPZCompMesh *> mesh_vectors(3, 0);
+    TPZManVector<int> active(3, 1);
+
+    mesh_vectors[0] = cmeshH1;      // H1
+    mesh_vectors[1] = cmeshMix->MeshVector()[1];      // Mixed potential
+    mesh_vectors[2] = cmeshMix->MeshVector()[0];      // HDiv mixed flux
+
+    TPZStack<int64_t> gelIndex;
+    for(int64_t i=0; i<cmeshH1->NElements(); i++){
+        TPZCompEl* cel = cmeshH1->Element(i);
+        if(!cel) continue;
+        TPZGeoEl* gel = cel->Reference();
+        if(!gel) continue;
+        if(gel->MaterialId() != 1) continue;
+        gelIndex.Push(gel->Index());
+    }
+    cmeshH1Mix->BuildMultiphysicsSpace(mesh_vectors,gelIndex);
+    std::ofstream ofs("CmeshH1Mix.txt");
+    cmeshH1Mix->Print(ofs);
 }

@@ -15,6 +15,8 @@ void InsertMaterialHybrid(TPZMultiphysicsCompMesh *cmesh, ProblemConfig &config,
 //// Insert volumetric and BC materials on a Mixed Computational Mesh
 void InsertMaterialMixed(TPZMultiphysicsCompMesh *cmesh_mixed, ProblemConfig config,PreConfig &pConfig);
 
+void InsertMaterialH1Mix(TPZMultiphysicsCompMesh *multMesh, PreConfig &pConfig, ProblemConfig &config);
+
 //// Atomic Flux Mesh construction for mixed approximations
 void BuildFluxMesh(TPZCompMesh *cmesh_flux, ProblemConfig &config, PreConfig &pConfig);
 

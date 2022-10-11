@@ -30,8 +30,13 @@ target_link_libraries(ErrorMeasurement PRIVATE Methods Tools)
 add_pz_target(
         NAME HybridizedMixed
         SOURCES main_HybridizedMixed.cpp)
-
 target_link_libraries(HybridizedMixed PRIVATE Methods Tools)
+
+add_pz_target(
+        NAME PragerSynge
+        SOURCES main_PragerSynge.cpp)
+target_link_libraries(PragerSynge PRIVATE Methods Tools)
+
 
 # Project to apply error estimation for hybrid H1 approximations
 add_pz_target(

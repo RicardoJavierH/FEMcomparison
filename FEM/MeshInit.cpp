@@ -12,6 +12,7 @@
 #include "TPZGenGrid2D.h"
 #include "TPZCompMeshTools.h"
 #include "TPZCompElDisc.h"
+#include "LCC_H1MixPSMaterial.h"
 
 
 void InsertMaterialMixed_MultiK(TPZMultiphysicsCompMesh *cmesh_mixed, ProblemConfig &config, PreConfig &pConfig){
@@ -137,6 +138,58 @@ void InsertMaterialHybrid_MultiK(TPZMultiphysicsCompMesh *cmesh_H1Hybrid, Proble
     cmesh_H1Hybrid->InsertMaterialObject(BCond0_Q2);
     cmesh_H1Hybrid->InsertMaterialObject(BCond1_Q1);
     cmesh_H1Hybrid->InsertMaterialObject(BCond1_Q2);
+}
+
+
+void InsertMaterialH1Mix(TPZMultiphysicsCompMesh *multMesh, PreConfig &pConfig, ProblemConfig &config){
+
+    int dim = pConfig.dim;
+    int matID = 1;
+    int dirichlet = -1;
+    int neumann = -2;
+
+    if(pConfig.type != 2) {// Dominio nao centrado na origen
+        multMesh->SetDefaultOrder(pConfig.k + pConfig.n);
+        multMesh->SetDimModel(dim);
+        multMesh->SetAllCreateFunctionsMultiphysicElem();
+
+        LCC_H1MixMaterial *material = new LCC_H1MixMaterial(matID, dim);//Using standard PermealityTensor = Identity.
+        
+#ifndef OPTMIZE_RUN_TIME
+            material->SetForcingFunction(config.exact->ForceFunc(),5);
+            material->SetExactSol(config.exact->ExactSolution(),5);
+#else
+
+        std::function<void (const TPZVec<REAL> &loc, TPZVec<STATE> &result)> sourceFunc = [](const TPZVec<REAL> &loc,TPZVec<STATE> &result)
+        {
+            for(auto &it:result) it = 1.;
+        };
+
+            material->SetForcingFunction(sourceFunc,0);
+#endif
+        
+        multMesh->InsertMaterialObject(material);
+
+        
+        
+//        //Boundary Conditions
+//        TPZFMatrix<STATE> val1(2, 2, 0.), val2(2, 1, 0.);
+//
+//        TPZMaterial *BCond0 = material->CreateBC(material, -1, dirichlet, val1, val2);
+//        if(pConfig.debugger)
+//        {
+//            BCond0->SetForcingFunction(config.exact.operator*().Exact());
+//        }
+//
+//        TPZMaterial *BCond1 = material->CreateBC(material, -2, neumann, val1, val2);
+//
+//        multMesh->InsertMaterialObject(BCond0);
+//        multMesh->InsertMaterialObject(BCond1);
+    }
+
+    else {
+        DebugStop();
+    }
 }
 
 #ifndef OPTMIZE_RUN_TIME
@@ -485,6 +538,10 @@ void InsertMaterialMixed(TPZMultiphysicsCompMesh *cmesh_mixed, ProblemConfig con
 
         auto *BCond1 = material->CreateBC(material, -2, neumann, val1, val2);
 
+#ifndef OPTMIZE_RUN_TIME
+            BCond1->SetForcingFunctionBC(config.exact->ExactSolution(),5);
+#endif
+        
         cmesh_mixed->InsertMaterialObject(BCond0);
         cmesh_mixed->InsertMaterialObject(BCond1);
     }
