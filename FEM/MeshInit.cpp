@@ -208,8 +208,8 @@ void SetFExact(TLaplaceExample1 *mat1, TLaplaceExample1 *mat2,PreConfig &pConfig
             mat2->fExact = TLaplaceExample1::ESteklovNonConst;
             break;
         case 3:
-//            mat1->fExact = TLaplaceExample1::ESteepWave;
-//            mat2->fExact = TLaplaceExample1::ESteepWave;
+            mat1->fExact = TLaplaceExample1::ESteepWave;
+            mat2->fExact = TLaplaceExample1::ESteepWave;
             DebugStop();
             break;
         default:
@@ -606,7 +606,7 @@ TPZCompMesh* InsertCMeshH1(ProblemConfig &config, PreConfig &pConfig) {
     int neumann = -2;
     int dim = config.gmesh->Dimension();
 
-    if(pConfig.type != 2) {
+    if(pConfig.type != 2) {// isn't ESteklovNonConst
         for (auto matid : config.materialids) {
             TPZDarcyFlow *mix = new TPZDarcyFlow(matid, cmesh->Dimension());
 #ifndef OPTMIZE_RUN_TIME

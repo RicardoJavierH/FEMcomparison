@@ -23,6 +23,8 @@
 #include "TPZFrontSym.h"
 #include "TPZStructMatrixOMPorTBB.h"
 #include "InputTreatment.h"
+#include <cstdlib>//to perturb uh
+#include <ctime>// to perturb uh
 
 #ifdef FEMCOMPARISON_USING_MKL
 #include "mkl.h"
@@ -213,8 +215,19 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
     
     std::cout << "Solving H1 " << std::endl;
 
+    if(1){
+        TPZFMatrix<REAL> mat(100,100);
+        cmeshH1->ComputeFillIn(100, mat);
+        VisualMatrix(mat, "matH1_1.vtk");
+    }
+    
     TPZLinearAnalysis an(cmeshH1);
 
+    if(1){
+        TPZFMatrix<REAL> mat(100,100);
+        cmeshH1->ComputeFillIn(100, mat);
+        VisualMatrix(mat, "matH1_2.vtk");
+    }
 #ifdef FEMCOMPARISON_USING_MKL
 //    TPZSSpStructMatrix<> strmat(cmeshH1);
 //    strmat.SetNumThreads(0);
@@ -259,7 +272,62 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
     an.Solve();
     
     //cmeshH1->Print(std::cout);
+    
+    //MARK: H1-uh perturbation
+//    int64_t ncoefs = cmeshH1->Solution().Rows();
+//    TPZFMatrix<STATE> &locmat = cmeshH1->Solution();
+//    for (int ind=0; ind < ncoefs; ind++){
+//        locmat(ind,0) += 0.;
+//
+//    }
+    
+    if(1){
+        srand (time(NULL));
+        int64_t ncel = cmeshH1->NElements();
+        std::set<int> matids = {-1};
+        for(int ic=0; ic<ncel; ic++){
+            TPZCompEl *cel = cmeshH1->ElementVec()[ic];
+            if(!cel){
+                continue;
+            }
+            
+            TPZGeoEl *gel = cel->Reference();
+            if(!gel){
+                continue;
+            }
+            
+            bool isinterior = true;
+            
+            //TODO: Tour the neighbors
+            TPZStack<TPZCompElSide> neighs;
+            int nneighs;
+            int nsides = gel->NSides();
+            for(int side=0; side<nsides; side++){
+                TPZGeoElSide geoelside(gel,side);
+                if(geoelside.HasNeighbour(matids)){
+                    isinterior = false;
+                }
+                
+                if(!isinterior){
+                    continue;
+                }
+                
+                TPZConnect &c = cel->Connect(side);
+                //int ncon = cel->NConnects();
+                TPZFMatrix<STATE> &sol = cmeshH1->Solution();
+                TPZBlock &matloc =  cmeshH1->Block();
+                int64_t seqnum = c.SequenceNumber();
+                int bsize = c.NShape() * c.NState();
+                
+                for (int i=0; i<bsize; i++){
+                    sol(matloc.Index(seqnum, i),0) = 0.5 - (STATE) rand() / RAND_MAX;
+                }
+                
+            }
+        }
 
+    }
+    
     int64_t nelem = cmeshH1->NElements();
     cmeshH1->LoadSolution(cmeshH1->Solution());
     cmeshH1->ExpandSolution();
@@ -293,7 +361,7 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
 
             plotname = out.str();
         }
-        int resolution=0;
+        int resolution=5;
         an.DefineGraphMesh(dim, scalnames, vecnames, plotname);
         an.PostProcess(resolution,dim);
     }
@@ -392,6 +460,9 @@ void ComputePragerSynge(TPZAnalysis &an,TPZMultiphysicsCompMesh *cmesh, std::ofs
 
     an.PostProcessError(terms, store_errors, Erro);
     //an.PostProcessError(Errors, store_errors);
+    for(int i=0; i<nTerms; i++){
+        terms[i] *= terms[i];
+    }
     
     std::cout << "Terms =(";
     for (int i = 0; i < terms.size(); i++){
@@ -412,16 +483,16 @@ void NonConformAssemblage(TPZMultiphysicsCompMesh *multiCmesh,int InterfaceMatId
     
     std::cout << "Solving " << pConfig.approx << " " << pConfig.topology << " ref " << pConfig.refLevel << " nThreads " << pConfig.tData.nThreads << " isColoring " << pConfig.shouldColor << " isTBB " << pConfig.isTBB << std::endl;
     {
-        TPZFMatrix<REAL> mat(50,50);
-        multiCmesh->ComputeFillIn(50, mat);
+        TPZFMatrix<REAL> mat(100,100);
+        multiCmesh->ComputeFillIn(100, mat);
         VisualMatrix(mat, "arch1.vtk");
     }
     
     TPZLinearAnalysis an(multiCmesh);
     
     {
-        TPZFMatrix<REAL> mat(50,50);
-        multiCmesh->ComputeFillIn(50, mat);
+        TPZFMatrix<REAL> mat(100,100);
+        multiCmesh->ComputeFillIn(100, mat);
         VisualMatrix(mat, "arch2.vtk");
     }
 #ifdef FEMCOMPARISON_USING_MKL
@@ -584,7 +655,7 @@ if(myParInterface){
 
             plotname = out.str();
         }
-        int resolution = 3;
+        int resolution = 1;
         an.DefineGraphMesh(dim, scalnames, vecnames, plotname);
         an.PostProcess(resolution, dim);
     }
@@ -595,10 +666,10 @@ void VerifyPragerSynge(int argc, char *argv[],PreConfig &pConfigH1, PreConfig &p
 
     //MARK: H1
     DataInitialization(argc,argv,pConfigH1);
-    if (pConfigH1.mode != 0){
+    if (pConfigH1.mode != 0){ //check that the FEM is H1
         DebugStop();
     }
-    
+
     ProblemConfig configH1;
     Configure(configH1,pConfigH1.refLevel,pConfigH1,argv);
 
@@ -608,7 +679,7 @@ void VerifyPragerSynge(int argc, char *argv[],PreConfig &pConfigH1, PreConfig &p
     if(1){
         std::ofstream ofs1("CmeshH1.txt");
         cmeshH1->Print(ofs1);
-        //cmeshH1->Solution().Print("solU_H1");
+        cmeshH1->Solution().Print("solU_H1");
         std::string command = "cp Erro.txt FEMH1_Erro.txt";
         system(command.c_str());
     }

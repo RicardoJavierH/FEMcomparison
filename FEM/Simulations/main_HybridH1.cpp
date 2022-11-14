@@ -41,11 +41,11 @@ int main(int argc, char *argv[]) {
     pConfig.problem = "ESinSin";              //// {"ESinSin","EArcTan",ESteklovNonConst", "ESteepWave"}
     pConfig.approx = "Hybrid";                //// {"H1","Hybrid", "Mixed"}
     pConfig.topology = "Quadrilateral";       //// Triangular, Quadrilateral, Tetrahedral, Hexahedral, Prism
-    pConfig.refLevel =1;                     //// How many refinements
-    pConfig.postProcess = false;                  //// Print geometric and computational mesh
+    pConfig.refLevel =5;                     //// How many refinements
+    pConfig.postProcess = true;                  //// Print geometric and computational mesh
     pConfig.shouldColor =false;
     pConfig.isTBB = false;
-    pConfig.tData.nThreads = 2;
+    pConfig.tData.nThreads = 0;
     
     
     if(argc == 2) {
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     if(pConfig.postProcess){
         std::string command = "cp ErroHybrid.txt " + pConfig.plotfile + "/Erro.txt";
         system(command.c_str());
-            FlushTable(pConfig,argv);
+        FlushTable(pConfig,argv);
     }
     //timer.stop();
     

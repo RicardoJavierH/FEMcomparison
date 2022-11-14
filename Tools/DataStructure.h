@@ -113,9 +113,9 @@ struct PreConfig{
     std::string automatedFileName;
     std::string automatedFilePath;
     
-    int mode = -1;           // 0 = "H1"; 1 = "Hybrid"; 2 = "Mixed";
+    int mode = -1;  // 0 = "H1"; 1 = "Hybrid"; 2 = "Mixed";
     int argc = 1;
-    int type= -1;
+    int type= -1;  // 0 = ESinSin; 1 = EArcTan; ...
 
     bool makeScript = false;
     bool isSimplify = false;
