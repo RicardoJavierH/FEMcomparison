@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     pConfigH1.problem = "ESinSin";          // {"ESinSin","EArcTan",ESteklovNonConst","ESteepWave"}
     pConfigH1.approx = "H1";                // {"H1","Hybrid", "Mixed"}
     pConfigH1.topology = "Quadrilateral";   // Triangular, Quadrilateral, Tetrahedral, Hexahedral, Prism
-    pConfigH1.refLevel = 3;            // How many refinements
+    pConfigH1.refLevel = 2;            // How many refinements
     pConfigH1.postProcess = true;         // Print geometric and computational mesh
 
     pConfigH1.shouldColor = false;

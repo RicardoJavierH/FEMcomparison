@@ -299,8 +299,8 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
             bool isinterior = true;
             
             //TODO: Tour the neighbors
-            TPZStack<TPZCompElSide> neighs;
-            int nneighs;
+            //TPZStack<TPZCompElSide> neighs;
+            //int nneighs;
             int nsides = gel->NSides();
             for(int side=0; side<nsides; side++){
                 TPZGeoElSide geoelside(gel,side);
@@ -315,12 +315,12 @@ void SolveH1Problem(TPZCompMesh *cmeshH1,struct ProblemConfig &config, struct Pr
                 TPZConnect &c = cel->Connect(side);
                 //int ncon = cel->NConnects();
                 TPZFMatrix<STATE> &sol = cmeshH1->Solution();
-                TPZBlock &matloc =  cmeshH1->Block();
+                TPZBlock &matblock =  cmeshH1->Block();
                 int64_t seqnum = c.SequenceNumber();
                 int bsize = c.NShape() * c.NState();
                 
                 for (int i=0; i<bsize; i++){
-                    sol(matloc.Index(seqnum, i),0) = 0.5 - (STATE) rand() / RAND_MAX;
+                    sol(matblock.Index(seqnum, i),0) = 0.5 - (STATE) rand() / RAND_MAX;
                 }
                 
             }
